@@ -1,24 +1,57 @@
-runs-on: windows-latest
+name: "CodeQL Advanced"
 
-steps:
-- name: Checkout repository
-  uses: actions/checkout@v4
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: '17 14 * * 5'
 
-- name: Setup build tools
-  run: |
-    choco install make -y
-    # 或其他所需工具
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: windows-latest  # 改为 Windows
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
 
-- name: Initialize CodeQL
-  uses: github/codeql-action/init@v4
-  with:
-    languages: c-cpp
-    build-mode: manual
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - language: c-cpp
+          build-mode: manual  # 改为 manual
 
-- name: Build
-  shell: pwsh
-  run: |
-    ./make.ps1 -target all
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-- name: Perform CodeQL Analysis
-  uses: github/codeql-action/analyze@v4
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        install: |
+          mingw-w64-x86_64-gcc
+          mingw-w64-x86_64-make
+          mingw-w64-x86_64-cmake
+          # 如果有其他依赖，在这里添加
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v4
+      with:
+        languages: ${{ matrix.language }}
+        build-mode: ${{ matrix.build-mode }}
+
+    - name: Build with MSYS2 Make
+      shell: msys2 {0}
+      run: |
+        # 在 MSYS2 环境下构建
+        ./make.ps1 -target all  # 或你实际使用的 target
+        
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v4
+      with:
+        category: "/language:${{matrix.language}}"
